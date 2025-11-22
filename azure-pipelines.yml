@@ -1,11 +1,25 @@
 # My Pipeline
 
-trigger:  none
+trigger:
+  branches:
+    include:
+      - main
+      - feature/*
+
+variables:
+  Myvar: 'Sumit_Serv_Conn'
+  MyWorkingDir: '$(System.DefaultWorkingDirectory)/Environment/Dev'
+  MysusbID: '6e65d60a-bc12-4f70-8dcd-6cdb4da48e3e'
+
+pr:
+  branches:
+    include:
+      - main
 
 stages:
   - stage: A
     displayName: Terraform_Init_Validate_Fmt_Plan
-    pool: My_Agent_Pool
+    pool: MyAgentPool
     jobs:
       - job: 
         steps:
@@ -14,9 +28,9 @@ stages:
           inputs:
             provider: 'azurerm'
             command: 'init'
-            workingDirectory: '$(System.DefaultWorkingDirectory)/Environment/Dev'
-            backendServiceArm: 'Sumit_Serv_Conn'
-            backendAzureRmOverrideSubscriptionID: '6e65d60a-bc12-4f70-8dcd-6cdb4da48e3e'
+            workingDirectory: $(MyWorkingDir)
+            backendServiceArm: $(Myvar)
+            backendAzureRmOverrideSubscriptionID: $(MysusbID)
             backendAzureRmResourceGroupName: 'sumuttestrg'
             backendAzureRmStorageAccountName: 'mycooolstorage'
             backendAzureRmContainerName: 'tfstate'
@@ -27,30 +41,32 @@ stages:
           inputs:
             provider: 'azurerm'
             command: 'validate'
-            workingDirectory: '$(System.DefaultWorkingDirectory)/Environment/Dev'
+            workingDirectory: $(MyWorkingDir)
 
         - task: TerraformTask@5
           inputs:
             provider: 'azurerm'
             command: 'custom'
-            workingDirectory: '$(System.DefaultWorkingDirectory)/Environment/Dev'
+            workingDirectory: $(MyWorkingDir)
             outputTo: 'console'
             customCommand: 'fmt'
-            environmentServiceNameAzureRM: 'Sumit_Serv_Conn'
-            environmentAzureRmOverrideSubscriptionID: '6e65d60a-bc12-4f70-8dcd-6cdb4da48e3e'
+            environmentServiceNameAzureRM: $(Myvar)
+            environmentAzureRmOverrideSubscriptionID: $(MysusbID)
 
         - task: TerraformTask@5
           displayName: Terraform_Plan
           inputs:
             provider: 'azurerm'
             command: 'plan'
-            workingDirectory: '$(System.DefaultWorkingDirectory)/Environment/Dev'
-            environmentServiceNameAzureRM: 'Sumit_Serv_Conn'
-            environmentAzureRmOverrideSubscriptionID: '6e65d60a-bc12-4f70-8dcd-6cdb4da48e3e'
+            workingDirectory: $(MyWorkingDir)
+            environmentServiceNameAzureRM: $(Myvar)
+            environmentAzureRmOverrideSubscriptionID: $(MysusbID)
 
 
   - stage: B
     displayName: Scanning
+    dependsOn: A
+    pool: MyAgentPool
     jobs:
       - job: 
         displayName: tfsecanning
@@ -58,10 +74,12 @@ stages:
         - task: tfsec@1
           inputs:
             version: 'v1.26.0'
-            dir: '$(System.DefaultWorkingDirectory)/Environment/Dev'
+            dir: $(MyWorkingDir)
 
   - stage: C
     displayName: Manual_Validation
+    dependsOn: B
+    pool: server
     jobs:
       - job:
         displayName: Manual_Validate
@@ -73,6 +91,9 @@ stages:
 
   - stage: D
     displayName: Terraform_Apply
+    dependsOn: C
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    pool: MyAgentPool
     jobs:
       - job:
         displayName: Terraform_Init
@@ -81,9 +102,9 @@ stages:
           inputs:
             provider: 'azurerm'
             command: 'init'
-            workingDirectory: '$(System.DefaultWorkingDirectory)/Environment/Dev'
-            backendServiceArm: 'Sumit_Serv_Conn'
-            backendAzureRmOverrideSubscriptionID: '6e65d60a-bc12-4f70-8dcd-6cdb4da48e3e'
+            workingDirectory: $(MyWorkingDir)
+            backendServiceArm: $(Myvar)
+            backendAzureRmOverrideSubscriptionID: $(MysusbID)
             backendAzureRmResourceGroupName: 'sumuttestrg'
             backendAzureRmStorageAccountName: 'mycooolstorage'
             backendAzureRmContainerName: 'tfstate'
@@ -93,10 +114,10 @@ stages:
           inputs:
             provider: 'azurerm'
             command: 'apply'
-            workingDirectory: '$(System.DefaultWorkingDirectory)/Environment/Dev'
+            workingDirectory: $(MyWorkingDir)
             commandOptions: '--auto-approve'
-            environmentServiceNameAzureRM: 'Sumit_Serv_Conn'
-            environmentAzureRmOverrideSubscriptionID: '6e65d60a-bc12-4f70-8dcd-6cdb4da48e3e'
+            environmentServiceNameAzureRM: $(Myvar)
+            environmentAzureRmOverrideSubscriptionID: $(MysusbID)
 
         
         
